@@ -263,7 +263,7 @@ class AVR(asyncio.Protocol):
         for input_number in range(1, total):
             self.query("ISN" + str(input_number).zfill(2))
 
-    def _parse_message(self, data):
+    def _parse_message(self, data):  # noqa C901
         """Interpret each message datagram from device and do the needful.
 
         This function receives datagrams from _assemble_buffer and inerprets
@@ -292,7 +292,7 @@ class AVR(asyncio.Protocol):
                 if data.startswith(key):
                     recognized = True
 
-                    value = data[len(key) :]
+                    value = data[len(key) :]  # noqa E203
                     oldvalue = getattr(self, "_" + key)
                     if oldvalue != value:
                         changeindicator = "New Value"
@@ -437,7 +437,7 @@ class AVR(asyncio.Protocol):
         try:
             self.transport.write(command)
             time.sleep(0.01)
-        except:
+        except Exception:
             self.log.warning("No transport found, unable to send command")
 
     #
@@ -644,7 +644,8 @@ class AVR(asyncio.Protocol):
     @mute.setter
     def mute(self, value):
         self._set_boolean("Z1MUT", value)
-        # Query mute because the AVR doesn't always return back the state (eg: after power on without changing the volume first)
+        # Query mute because the AVR doesn't always return back the state
+        # (eg: after power on without changing the volume first)
         self.query("Z1MUT")
 
     #

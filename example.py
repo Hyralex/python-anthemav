@@ -31,7 +31,7 @@ async def test():
 
     log.info("Connecting to Anthem AVR at %s:%i" % (host, port))
 
-    conn = yield from anthemav.Connection.create(
+    conn = await anthemav.Connection.create(
         host=host, port=port, loop=loop, update_callback=log_callback
     )
 
@@ -39,7 +39,7 @@ async def test():
     conn.protocol.power = True
     log.info("Power state is " + str(conn.protocol.power))
 
-    yield from asyncio.sleep(2, loop=loop)
+    await asyncio.sleep(2, loop=loop)
 
     log.info("Panel brightness (raw) is " + str(conn.protocol.panel_brightness))
     log.info("Panel brightness (text) is " + str(conn.protocol.panel_brightness_text))
@@ -61,5 +61,5 @@ async def test():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.get_event_loop()
-    asyncio.async(test())
+    loop.run_until_complete(test())
     loop.run_forever()

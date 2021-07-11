@@ -7,7 +7,7 @@ __all__ = "Connection"
 
 try:
     ensure_future = asyncio.ensure_future
-except:
+except Exception:
     ensure_future = getattr(asyncio, "async")
 
 

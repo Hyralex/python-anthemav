@@ -263,7 +263,7 @@ class AVR(asyncio.Protocol):
         for input_number in range(1, total):
             self.query("ISN" + str(input_number).zfill(2))
 
-    def _parse_message(self, data):  # noqa C901
+    def _parse_message(self, data):
         """Interpret each message datagram from device and do the needful.
 
         This function receives datagrams from _assemble_buffer and inerprets
@@ -292,7 +292,7 @@ class AVR(asyncio.Protocol):
                 if data.startswith(key):
                     recognized = True
 
-                    value = data[len(key) :]  # noqa E203
+                    value = data[len(key) :]
                     oldvalue = getattr(self, "_" + key)
                     if oldvalue != value:
                         changeindicator = "New Value"

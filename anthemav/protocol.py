@@ -1,7 +1,7 @@
 """Module to maintain AVR state information and network interface."""
 import asyncio
 import logging
-from typing import Awaitable, Callable, Dict
+from typing import Awaitable, Callable
 
 from anthemav.device_error import DeviceError
 from anthemav.parser import parse_message
@@ -51,8 +51,8 @@ ALM_RESTRICTED = ["00", "01", "02", "03", "04", "05", "06", "07"]
 
 ALM_RESTRICTED_MODEL = ["MRX 520"]
 
-LOOKUP: Dict[str, Dict[str, str]] = {}
-ZONELOOKUP: Dict[str, Dict[str, str]] = {}
+LOOKUP: dict[str, dict[str, str]] = {}
+ZONELOOKUP: dict[str, dict[str, str]] = {}
 
 ZONELOOKUP["POW"] = {"description": "Zone Power", "0": "Off", "1": "On"}
 ZONELOOKUP["VOL"] = {"description": "Zone Volume"}
@@ -202,11 +202,11 @@ class AVR(asyncio.Protocol):
 
     def __init__(
         self,
-        update_callback: Callable[[str], None] = None,
-        loop: asyncio.AbstractEventLoop = None,
-        connection_lost_callback: Callable[[], Awaitable[None]] = None,
+        update_callback: Callable[[str], None] | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
+        connection_lost_callback: Callable[[], Awaitable[None]] | None = None,
         buffer_max_size: int = 8192,
-    ):
+    ) -> None:
         """Protocol handler that handles all status and changes on AVR.
 
         This class is expected to be wrapped inside a Connection class object
@@ -256,13 +256,13 @@ class AVR(asyncio.Protocol):
         self._deviceinfo_received = asyncio.Event()
         self._alm_number = {"None": 0}
         self._available_input_numbers = []
-        self.zones: Dict[int, Zone] = {1: Zone(self, 1)}
-        self.values: Dict[str, str] = {}
+        self.zones: dict[int, Zone] = {1: Zone(self, 1)}
+        self.values: dict[str, str] = {}
 
         for key in LOOKUP:
             setattr(self, f"_{key}", "")
 
-    async def wait_for_device_initialised(self, timeout: float):
+    async def wait_for_device_initialised(self, timeout: float) -> None:
         """Wait to receive the model and mac address for the device.
 
         Args:
@@ -312,7 +312,7 @@ class AVR(asyncio.Protocol):
         """
         return self._deviceinfo_received.is_set()
 
-    def _set_device_initialised(self):
+    def _set_device_initialised(self) -> None:
         """Indicate if the model and mac address have been received.
 
         Only sets the initialization event if both model and MAC address are valid.
@@ -340,7 +340,7 @@ class AVR(asyncio.Protocol):
         )
         self._deviceinfo_received.set()
 
-    async def refresh_core(self):
+    async def refresh_core(self) -> None:
         """Query device for all attributes that exist regardless of power state.
 
         This will force a refresh for all device queries that are valid to
@@ -358,7 +358,7 @@ class AVR(asyncio.Protocol):
             # small delay between command
             await asyncio.sleep(0.01)
 
-    async def poweron_refresh(self):
+    async def poweron_refresh(self) -> None:
         """Keep requesting all attributes until it works.
 
         Immediately after a power on event (POW1) the AVR is inconsistent with
@@ -375,7 +375,7 @@ class AVR(asyncio.Protocol):
             await asyncio.sleep(5)
             await self.poweron_refresh()
 
-    async def refresh_all(self):
+    async def refresh_all(self) -> None:
         """Query device for all attributes that are known.
 
         This will force a refresh for all device queries that the module is
@@ -391,19 +391,19 @@ class AVR(asyncio.Protocol):
             # MDX receivers don't returns the list of available input numbers and have a fixed list
             self._populate_inputs(12)
 
-    async def refresh_power(self):
+    async def refresh_power(self) -> None:
         """Refresh power of all zones."""
         self.log.debug("refresh_power")
         for zone in self.zones:
             self.query(f"Z{zone}POW")
             await asyncio.sleep(0.02)
 
-    async def refresh_zone(self, zone: int):
+    async def refresh_zone(self, zone: int) -> None:
         """Query all zones for all attributes."""
         self.log.debug(f"refresh_zone: {zone}")
         await self.query_commands(ZONELOOKUP, zone)
 
-    async def query_commands(self, commands: Dict[str, Dict[str, str]], zone: int = 0):
+    async def query_commands(self, commands: dict[str, dict[str, str]], zone: int = 0) -> None:
         """Query a list of commands."""
         for key in commands:
             if key not in self._ignored_commands:
@@ -423,7 +423,7 @@ class AVR(asyncio.Protocol):
     # asyncio network functions
     #
 
-    def connection_made(self, transport: asyncio.Transport):
+    def connection_made(self, transport: asyncio.Transport) -> None:
         """Called when asyncio.Protocol establishes the network connection."""
         self.log.debug("Connection established to AVR")
         self.transport = transport
@@ -437,10 +437,11 @@ class AVR(asyncio.Protocol):
             zone.need_refresh = True
         asyncio.create_task(self.refresh_core())
 
-    def data_received(self, data):
+    def data_received(self, data: bytes) -> None:
         """Called when asyncio.Protocol detects received data from network."""
         try:
-            self.buffer += data.decode()
+            # Decode with UTF-8 and replace errors to handle special characters
+            self.buffer += data.decode('utf-8', errors='replace')
             self.log.debug("Received %d bytes from AVR: %s", len(self.buffer), self.buffer)
 
             # Check buffer size and handle overflow
@@ -463,7 +464,7 @@ class AVR(asyncio.Protocol):
             )
             # Continue operation after error - don't crash
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Exception | None) -> None:
         """Called when asyncio.Protocol loses the network connection."""
         self.log.warning("Lost connection to receiver")
 
@@ -476,7 +477,7 @@ class AVR(asyncio.Protocol):
         if self._connection_lost_callback:
             asyncio.create_task(self._connection_lost_callback())
 
-    async def _assemble_buffer(self):
+    async def _assemble_buffer(self) -> None:
         """Split up received data from device into individual commands.
 
         Data sent by the device is a sequence of datagrams separated by
@@ -520,7 +521,7 @@ class AVR(asyncio.Protocol):
                 self.transport.resume_reading()
         return
 
-    def _populate_inputs(self, total):
+    def _populate_inputs(self, total: int) -> None:
         """Request the names for all active, configured inputs on the device.
 
         Once we learn how many inputs are configured, this function is called
@@ -538,7 +539,7 @@ class AVR(asyncio.Protocol):
                 ):
                     self.query(f"ISN{input_number:02d}")
 
-    async def _parse_message(self, data: str):
+    async def _parse_message(self, data: str) -> None:
         """Interpret each message datagram from device and do the needful.
 
         This function receives datagrams from _assemble_buffer and inerprets
@@ -720,13 +721,13 @@ class AVR(asyncio.Protocol):
 
         return newdata
 
-    def power_off_device(self):
+    def power_off_device(self) -> None:
         """Set device as powered off."""
         self.log.debug("Power off device")
         self._poweron_refresh_successful = False
         self._device_power = False
 
-    def power_on_device(self):
+    def power_on_device(self) -> None:
         """Set device as powered on."""
         self.log.debug("Powered on device detected refresh all attributes")
         self._device_power = True
@@ -734,14 +735,14 @@ class AVR(asyncio.Protocol):
         loop = asyncio.get_running_loop()
         loop.call_later(1, lambda: asyncio.create_task(self.poweron_refresh()))
 
-    async def refresh_input(self):
+    async def refresh_input(self) -> None:
         """Refresh specific input commands."""
         if self._model_series == MODEL_X20:
             self.query("Z1ARC")
         elif self._model_series == MODEL_X40:
             self.query(f"IS{self.zones[1].input_number}ARC")
 
-    async def force_refresh_power(self, command):
+    async def force_refresh_power(self, command: str) -> None:
         """Force refresh of poweron when receiving commands."""
         if (
             self._force_refresh is False
@@ -756,7 +757,7 @@ class AVR(asyncio.Protocol):
             loop = asyncio.get_running_loop()
             loop.call_later(2, setattr, self, "_force_refresh", False)
 
-    def query(self, item: str):
+    def query(self, item: str) -> None:
         """Issue a raw query to the device for an item.
 
         This function is used to request that the device supply the current
@@ -779,7 +780,7 @@ class AVR(asyncio.Protocol):
         item = item + "?"
         self.command(item)
 
-    def set_model_command(self, model: str):
+    def set_model_command(self, model: str) -> None:
         """Add the commands to the model."""
         if "40" in model or "70" in model or "90" in model:
             self.log.debug("Set Command to Model x40")
@@ -802,7 +803,7 @@ class AVR(asyncio.Protocol):
             self.command("ECH1")
             self.query("IDN")
 
-    def set_zones(self, model: str):
+    def set_zones(self, model: str) -> None:
         """Set zones for the appropriate objects."""
         number_of_zones: int = 0
         if self._model_series == MODEL_MDX and "16" in model:
@@ -819,7 +820,7 @@ class AVR(asyncio.Protocol):
             if zone not in self.zones:
                 self.zones[zone] = Zone(self, zone)
 
-    def command(self, command: str):
+    def command(self, command: str) -> None:
         """Issue a raw command to the device.
 
         This function is used to update a data item on the device.  It's used
@@ -841,7 +842,7 @@ class AVR(asyncio.Protocol):
         command = command + ";"
         self.formatted_command(command)
 
-    def formatted_command(self, command: str):
+    def formatted_command(self, command: str) -> None:
         """Issue a raw, formatted command to the device.
 
         This function is invoked by both query and command and is the point
@@ -895,7 +896,7 @@ class AVR(asyncio.Protocol):
         return self._model_series != MODEL_MDX
 
     @property
-    def attenuation(self):
+    def attenuation(self) -> int:
         """Current volume attenuation in dB (read/write).
 
         You can get or set the current attenuation value on the device with this
@@ -909,11 +910,11 @@ class AVR(asyncio.Protocol):
         self.zones[1].attenuation
 
     @attenuation.setter
-    def attenuation(self, value):
+    def attenuation(self, value: int) -> None:
         self.zones[1].attenuation = value
 
     @property
-    def volume(self):
+    def volume(self) -> int:
         """Current volume level (read/write).
 
         You can get or set the current volume value on the device with this
@@ -927,11 +928,11 @@ class AVR(asyncio.Protocol):
         return self.zones[1].volume
 
     @volume.setter
-    def volume(self, value):
+    def volume(self, value: int) -> None:
         self.zones[1].volume = value
 
     @property
-    def volume_as_percentage(self):
+    def volume_as_percentage(self) -> float:
         """Current volume as percentage (read/write).
 
         You can get or set the current volume value as a percentage.  Valid
@@ -945,7 +946,7 @@ class AVR(asyncio.Protocol):
         return self.zones[1].volume_as_percentage
 
     @volume_as_percentage.setter
-    def volume_as_percentage(self, value):
+    def volume_as_percentage(self, value: float) -> None:
         self.zones[1].volume_as_percentage = value
 
     #
@@ -953,7 +954,7 @@ class AVR(asyncio.Protocol):
     # properties that are read/write
     #
 
-    def _get_boolean(self, key):
+    def _get_boolean(self, key: str) -> bool:
         keyname = "_" + key
         try:
             value = getattr(self, keyname)
@@ -963,14 +964,14 @@ class AVR(asyncio.Protocol):
         except AttributeError:
             return False
 
-    def _convert_to_boolean(self, value: str) -> bool:
+    def _convert_to_boolean(self, value: str) -> bool | None:
         if value == "1":
             return True
         elif value == "0":
             return False
         return None
 
-    def _set_boolean(self, key, value):
+    def _set_boolean(self, key: str, value: bool) -> None:
         if value is True:
             self.command(key + "1")
         else:
@@ -981,7 +982,7 @@ class AVR(asyncio.Protocol):
     #
 
     @property
-    def power(self):
+    def power(self) -> bool:
         """Report if device powered on or off (read/write).
 
         Returns and expects a boolean value.
@@ -989,11 +990,11 @@ class AVR(asyncio.Protocol):
         return self.zones[1].power
 
     @power.setter
-    def power(self, value):
+    def power(self, value: bool) -> None:
         self.zones[1].power = value
 
     @property
-    def txstatus(self):
+    def txstatus(self) -> bool:
         """Current TX Status of the device (read/write).
 
         When enabled, all commands, status changes, and control information
@@ -1010,11 +1011,11 @@ class AVR(asyncio.Protocol):
         return self._get_boolean("ECH")
 
     @txstatus.setter
-    def txstatus(self, value):
+    def txstatus(self, value: bool) -> None:
         self._set_boolean("ECH", value)
 
     @property
-    def standby_control(self):
+    def standby_control(self) -> bool:
         """Current Standby IP Control of the device (read/write).
 
         When disabled, the AVM/MRX goes into a low-consumption standby mode and
@@ -1028,7 +1029,7 @@ class AVR(asyncio.Protocol):
         return self._get_boolean("SIP")
 
     @standby_control.setter
-    def standby_control(self, value):
+    def standby_control(self, value: bool) -> None:
         self._set_boolean("SIP", value)
 
     @property
@@ -1043,7 +1044,7 @@ class AVR(asyncio.Protocol):
         return None
 
     @arc.setter
-    def arc(self, value):
+    def arc(self, value: bool) -> None:
         if self._model_series == MODEL_X40:
             self._set_boolean(f"IS{self.zones[1].input_number}ARC", value)
         elif self._model_series == MODEL_X20:
@@ -1054,42 +1055,42 @@ class AVR(asyncio.Protocol):
     #
 
     @property
-    def model(self):
+    def model(self) -> str:
         """Device Model Name (read-only)."""
         return self._IDM or UNKNOWN_MODEL
 
     @property
-    def swversion(self):
+    def swversion(self) -> str:
         """Software version (read-only)."""
         return self._IDS or "Unknown Version"
 
     @property
-    def region(self):
+    def region(self) -> str:
         """Region (read-only)."""
         return self._IDR or "Unknown Region"
 
     @property
-    def build_date(self):
+    def build_date(self) -> str:
         """Software build date (read-only)."""
         return self._IDB or "Unknown Build Date"
 
     @property
-    def hwversion(self):
+    def hwversion(self) -> str:
         """Hardware version (read-only)."""
         return self._IDH or "Unknown Version"
 
     @property
-    def macaddress(self):
+    def macaddress(self) -> str:
         """Network MCU MAC address (read-only)."""
         return self._IDN or self._EMAC or self._WMAC or self._MAC or EMPTY_MAC
 
     @property
-    def audio_input_name(self):
+    def audio_input_name(self) -> str:
         """Current audio input format short description (read-only)."""
         return self._Z1AIN or ""
 
     @property
-    def audio_input_ratename(self):
+    def audio_input_ratename(self) -> str:
         """Current audio input format sample or bit rate (read-only)."""
         return self._Z1AIR or ""
 
@@ -1097,7 +1098,7 @@ class AVR(asyncio.Protocol):
     # Read-only raw numeric properties
     #
 
-    def _get_integer(self, key):
+    def _get_integer(self, key: str) -> int | None:
         keyname = "_" + key
         if hasattr(self, keyname):
             value = getattr(self, keyname)
@@ -1107,7 +1108,7 @@ class AVR(asyncio.Protocol):
             return
 
     @property
-    def dolby_dialog_normalization(self):
+    def dolby_dialog_normalization(self) -> int | None:
         """Query Dolby Digital dialog normalization amount (read-only).
 
         Returns value in dB of normalization (if applicable).
@@ -1115,17 +1116,17 @@ class AVR(asyncio.Protocol):
         return self._get_integer("Z1DIA")
 
     @property
-    def horizontal_resolution(self):
+    def horizontal_resolution(self) -> int | None:
         """Query active horizontal video resolution (in pixels)."""
         return self._get_integer("Z1IRH")
 
     @property
-    def vertical_resolution(self):
+    def vertical_resolution(self) -> int | None:
         """Query active vertical video resolution (in pixels)."""
         return self._get_integer("Z1IRV")
 
     @property
-    def audio_input_bitrate(self):
+    def audio_input_bitrate(self) -> int | None:
         """Query audio input bitrate (in kbps).
 
         For Analog/PCM inputs this is equal to the sample rate multiplied by
@@ -1134,7 +1135,7 @@ class AVR(asyncio.Protocol):
         return self._get_integer("Z1BRT")
 
     @property
-    def audio_input_samplerate(self):
+    def audio_input_samplerate(self) -> int | None:
         """Query audio input sampling rate (kHz)."""
         return self._get_integer("Z1SRT")
 
@@ -1142,7 +1143,7 @@ class AVR(asyncio.Protocol):
     # Helper functions for working with raw/text multi-property items
     #
     #
-    def _get_multiprop(self, key, mode="raw"):
+    def _get_multiprop(self, key: str, mode: str = "raw") -> str | None:
         keyname = "_" + key
 
         if hasattr(self, keyname):
@@ -1165,7 +1166,7 @@ class AVR(asyncio.Protocol):
     #
     #
     @property
-    def panel_brightness(self):
+    def panel_brightness(self) -> str | None:
         """Current front panel brightness value (int 0-3) (read-write).
 
         0=off, 1=low, 2=medium, 3=high
@@ -1173,26 +1174,26 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("FPB", mode="raw")
 
     @property
-    def panel_brightness_text(self):
+    def panel_brightness_text(self) -> str | None:
         """Current front panel brighness value (str) (read-only)."""
         return self._get_multiprop("FPB", mode="text")
 
     @panel_brightness.setter
-    def panel_brightness(self, number):
+    def panel_brightness(self, number: int) -> None:
         if isinstance(number, int):
             if 0 <= number <= 3:
                 self.log.debug("Switching panel brightness to %s", str(number))
                 self.command("FPB" + str(number))
 
     @property
-    def audio_listening_mode_list(self):
+    def audio_listening_mode_list(self) -> list[str]:
         """List of available listening mode."""
         if any(m in self.model for m in ALM_RESTRICTED_MODEL):
             return [LOOKUP["Z1ALM"][s] for s in ALM_RESTRICTED]
         return list(self._alm_number.keys())
 
     @property
-    def audio_listening_mode(self):
+    def audio_listening_mode(self) -> str | None:
         """Current audio listening mode (00-16) (read-write).
 
         Audio Listening Mode: 00=None, 01=AnthemLogic-Movie,
@@ -1207,25 +1208,25 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("Z1ALM", mode="raw")
 
     @property
-    def audio_listening_mode_text(self):
+    def audio_listening_mode_text(self) -> str | None:
         """Current audio listening mode (str) (read-only)."""
         return self._get_multiprop("Z1ALM", mode="text")
 
     @audio_listening_mode.setter
-    def audio_listening_mode(self, number):
+    def audio_listening_mode(self, number: int) -> None:
         if isinstance(number, int):
             if 0 <= number <= 16:
                 self.log.debug("Switching audio listening mode to %s", number)
                 self.command("Z1ALM" + str(number).zfill(2))
 
     @audio_listening_mode_text.setter
-    def audio_listening_mode_text(self, text):
+    def audio_listening_mode_text(self, text: str) -> None:
         self.log.debug("Switching audio listening mode to %s", text)
         if text in self._alm_number:
             self.command(f"Z1ALM{self._alm_number[text]:02d}")
 
     @property
-    def dolby_dynamic_range(self):
+    def dolby_dynamic_range(self) -> str | None:
         """Current Dolby Dynamic Range setting (0-2) (read-write).
 
         Applies to Dolby Digital 5.1 source only.
@@ -1235,12 +1236,12 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("Z1DYN", mode="raw")
 
     @property
-    def dolby_dynamic_range_text(self):
+    def dolby_dynamic_range_text(self) -> str | None:
         """Current Dolby Dynamic Range setting (str) (read-only)."""
         return self._get_multiprop("Z1DYN", mode="text")
 
     @dolby_dynamic_range.setter
-    def dolby_dynamic_range(self, number):
+    def dolby_dynamic_range(self, number: int) -> None:
         if isinstance(number, int):
             if 0 <= number <= 2:
                 self.log.debug("Switching Dolby dynamic range to %s", str(number))
@@ -1251,7 +1252,7 @@ class AVR(asyncio.Protocol):
     #
 
     @property
-    def video_input_resolution(self):
+    def video_input_resolution(self) -> str | None:
         """Current video input resolution (0-14) (read-only).
 
         0=no input, 1=other, 2=1080p60, 3=1080p50, 4=1080p24, 5=1080i60,
@@ -1261,12 +1262,12 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("Z1VIR", mode="raw")
 
     @property
-    def video_input_resolution_text(self):
+    def video_input_resolution_text(self) -> str | None:
         """Current video input resolution (str) (read-only)."""
         return self._get_multiprop("Z1VIR", mode="text")
 
     @property
-    def audio_input_channels(self):
+    def audio_input_channels(self) -> str | None:
         """Current audio input channels (0-7) (read-only).
 
         0=no input, 1=other, 2=mono (center channel only), 3=2-channel,
@@ -1275,12 +1276,12 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("Z1AIC", mode="raw")
 
     @property
-    def audio_input_channels_text(self):
+    def audio_input_channels_text(self) -> str | None:
         """Current audio input channels (str) (read-only)."""
         return self._get_multiprop("Z1AIC", mode="text")
 
     @property
-    def audio_input_format(self):
+    def audio_input_format(self) -> str | None:
         """Current audio input format (0-6) (read-only).
 
         0=no input, 1=Analog, 2=PCM, 3=Dolby, 4= DSD, 5=DTS, 6=Atmos.
@@ -1288,7 +1289,7 @@ class AVR(asyncio.Protocol):
         return self._get_multiprop("Z1AIF", mode="raw")
 
     @property
-    def audio_input_format_text(self):
+    def audio_input_format_text(self) -> str | None:
         """Current audio input format (str) (read-only)."""
         return self._get_multiprop("Z1AIF", mode="text")
 
@@ -1297,7 +1298,7 @@ class AVR(asyncio.Protocol):
     #
 
     @property
-    def input_list(self):
+    def input_list(self) -> list[str]:
         """List of all enabled inputs."""
         return list(self._input_numbers.keys())
 
@@ -1306,14 +1307,14 @@ class AVR(asyncio.Protocol):
     #
 
     @property
-    def dump_rawdata(self):
+    def dump_rawdata(self) -> str:
         """Return contents of transport object for debugging forensics."""
         if hasattr(self, "transport"):
             attrs = vars(self.transport)
             return ", ".join("%s: %s" % item for item in attrs.items())
 
     @property
-    def test_string(self):
+    def test_string(self) -> str:
         """I really do."""
         return "I like cows"
 
@@ -1325,7 +1326,7 @@ class Zone:
         self._zone = zone
         self._avr = avr
         self.need_refresh = True
-        self.values = {}
+        self.values: dict[str, str] = {}
 
     def command(self, command: str) -> None:
         self._avr.command(f"Z{self._zone}{command}")
@@ -1333,7 +1334,7 @@ class Zone:
     def query(self, command: str) -> None:
         self._avr.query(f"Z{self._zone}{command}")
 
-    def _get_integer(self, key, default: int = 0) -> int:
+    def _get_integer(self, key: str, default: int = 0) -> int:
         if key not in self.values:
             return default
         try:
@@ -1341,7 +1342,7 @@ class Zone:
         except ValueError:
             return 0
 
-    def _get_boolean(self, key) -> bool:
+    def _get_boolean(self, key: str) -> bool:
         if key not in self.values:
             return False
         try:
@@ -1351,13 +1352,13 @@ class Zone:
         except AttributeError:
             return False
 
-    def _set_boolean(self, key: str, value: bool):
+    def _set_boolean(self, key: str, value: bool) -> None:
         if value is True:
             self.command(key + "1")
         else:
             self.command(key + "0")
 
-    def get_current_input_value(self, command: str) -> str:
+    def get_current_input_value(self, command: str) -> str | None:
         if self.input_number > 0 and self._avr._model_series == MODEL_X40:
             return self._avr.values.get(f"IS{self.input_number}{command}")
         return None
@@ -1395,7 +1396,7 @@ class Zone:
         except ValueError:
             return 0
 
-    def volume_to_attenuation(self, value: int):
+    def volume_to_attenuation(self, value: int) -> int:
         """Convert a volume value to a native attenuation value.
 
         Takes a volume value and turns it into an attenuation value suitable
@@ -1420,7 +1421,7 @@ class Zone:
         return self._get_boolean("POW")
 
     @power.setter
-    def power(self, value: bool):
+    def power(self, value: bool) -> None:
         self._set_boolean("POW", value)
         self.query("POW")
 
@@ -1444,7 +1445,7 @@ class Zone:
             return self.attenuation_to_volume(self.attenuation)
 
     @volume.setter
-    def volume(self, value: int):
+    def volume(self, value: int) -> None:
         if 0 <= value <= 100:
             if self._avr._model_series == MODEL_X40:
                 self.command(f"PVOL{value}")
@@ -1469,7 +1470,7 @@ class Zone:
         return volume_per
 
     @volume_as_percentage.setter
-    def volume_as_percentage(self, value: float):
+    def volume_as_percentage(self, value: float) -> None:
         if 0 <= value <= 1:
             value = round(value * 100)
             self.volume = value
@@ -1489,7 +1490,7 @@ class Zone:
         return self._get_integer("VOL", -90)
 
     @attenuation.setter
-    def attenuation(self, value: int):
+    def attenuation(self, value: int) -> None:
         if -90 <= value <= 0:
             self._avr.log.debug("Setting attenuation to %s", str(value))
             self.command(f"VOL{value}")
@@ -1500,7 +1501,7 @@ class Zone:
         return self._get_boolean("MUT")
 
     @mute.setter
-    def mute(self, value: bool):
+    def mute(self, value: bool) -> None:
         self._set_boolean("MUT", value)
         # Query mute because the AVR doesn't always return back the state
         # (eg: after power on without changing the volume first)
@@ -1512,7 +1513,7 @@ class Zone:
         return self._get_integer("INP")
 
     @input_number.setter
-    def input_number(self, number: int):
+    def input_number(self, number: int) -> None:
         if 1 <= number <= 99:
             self._avr.log.debug(f"Switching input to {number} for zone {self._zone}")
             self.command(f"INP{number}")
@@ -1525,7 +1526,7 @@ class Zone:
         return self._avr._input_names.get(self.input_number, "Unknown")
 
     @input_name.setter
-    def input_name(self, value: str):
+    def input_name(self, value: str) -> None:
         number = self._avr._input_numbers.get(value, 0)
         if number > 0:
             self.input_number = number

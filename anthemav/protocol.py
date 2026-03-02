@@ -203,42 +203,15 @@ class AVR(asyncio.Protocol):
     def __init__(
         self,
         update_callback: Callable[[str], None] | None = None,
-        loop: asyncio.AbstractEventLoop | None = None,
         connection_lost_callback: Callable[[], Awaitable[None]] | None = None,
         buffer_max_size: int = 8192,
     ) -> None:
-        """Protocol handler that handles all status and changes on AVR.
+        """Initialize the AVR protocol handler.
 
-        This class is expected to be wrapped inside a Connection class object
-        which will maintain the socket and handle auto-reconnects.
-
-            :param update_callback:
-                called if any state information changes in device (optional)
-            :param connection_lost_callback:
-                called when connection is lost to device (optional)
-            :param loop:
-                asyncio event loop (optional, deprecated)
-            :param buffer_max_size:
-                maximum buffer size in bytes (optional, default 8192)
-
-            :type update_callback:
-                callable
-            :type: connection_lost_callback:
-                callable
-            :type loop:
-                asyncio.loop (deprecated)
-            :type buffer_max_size:
-                int
+        :param update_callback: Called when device state changes
+        :param connection_lost_callback: Called when connection is lost
+        :param buffer_max_size: Maximum buffer size in bytes
         """
-        # Accept loop for backward compatibility but don't store it
-        if loop is not None:
-            import warnings
-            warnings.warn(
-                "The 'loop' parameter is deprecated and will be ignored. "
-                "The running event loop will be used automatically.",
-                DeprecationWarning,
-                stacklevel=2
-            )
         self.log = logging.getLogger(__name__)
         self._connection_lost_callback = connection_lost_callback
         self._update_callback = update_callback
@@ -248,7 +221,7 @@ class AVR(asyncio.Protocol):
         self._input_numbers = {}
         self._device_power = False
         self._poweron_refresh_successful = False
-        self.transport: asyncio.Transport = None
+        self.transport = None
         self._ignored_commands = []
         self._force_refresh = False
         self._model_series = ""
@@ -256,20 +229,16 @@ class AVR(asyncio.Protocol):
         self._deviceinfo_received = asyncio.Event()
         self._alm_number = {"None": 0}
         self._available_input_numbers = []
-        self.zones: dict[int, Zone] = {1: Zone(self, 1)}
-        self.values: dict[str, str] = {}
+        self.zones = {1: Zone(self, 1)}
+        self.values = {}
 
         for key in LOOKUP:
             setattr(self, f"_{key}", "")
 
     async def wait_for_device_initialised(self, timeout: float) -> None:
-        """Wait to receive the model and mac address for the device.
+        """Wait for device initialization (model and MAC address).
 
-        Args:
-            timeout: Maximum time to wait for device initialization in seconds
-
-        Raises:
-            DeviceError: If device initialization times out or device info is incomplete
+        :raises DeviceError: If initialization times out or is incomplete
         """
         try:
             await asyncio.wait_for(self._deviceinfo_received.wait(), timeout)
@@ -279,30 +248,14 @@ class AVR(asyncio.Protocol):
                 f"Model: {self.model}, MAC: {self.macaddress}"
             )
             self.log.error(error_msg)
-            raise DeviceError(
-                message=error_msg,
-                context={
-                    "timeout": timeout,
-                    "model": self.model,
-                    "macaddress": self.macaddress
-                }
-            )
+            raise DeviceError(message=error_msg, context={"timeout": timeout, "model": self.model, "macaddress": self.macaddress})
 
         if self.macaddress == EMPTY_MAC or self.model == UNKNOWN_MODEL:
-            error_msg = (
-                f"Device initialization incomplete. "
-                f"Model: {self.model}, MAC: {self.macaddress}"
-            )
+            error_msg = f"Device initialization incomplete. Model: {self.model}, MAC: {self.macaddress}"
             self.log.error(error_msg)
-            raise DeviceError(
-                message=error_msg,
-                context={
-                    "model": self.model,
-                    "macaddress": self.macaddress
-                }
-            )
+            raise DeviceError(message=error_msg, context={"model": self.model, "macaddress": self.macaddress})
 
-        self.log.debug("device is initialised")
+        self.log.debug("Device initialized")
 
     def is_initialized(self) -> bool:
         """Check if device is initialized without blocking.
@@ -313,49 +266,26 @@ class AVR(asyncio.Protocol):
         return self._deviceinfo_received.is_set()
 
     def _set_device_initialised(self) -> None:
-        """Indicate if the model and mac address have been received.
-
-        Only sets the initialization event if both model and MAC address are valid.
-        Model must not be UNKNOWN_MODEL and MAC must not be EMPTY_MAC.
-        """
-        # Verify model is valid
+        """Set initialization event if model and MAC are valid."""
         if self.model == UNKNOWN_MODEL:
-            self.log.debug(
-                "Device initialization incomplete: model is UNKNOWN_MODEL"
-            )
+            self.log.debug("Device initialization incomplete: model is UNKNOWN_MODEL")
             return
 
-        # Verify MAC address is valid
         if self.macaddress == EMPTY_MAC:
-            self.log.debug(
-                "Device initialization incomplete: MAC is EMPTY_MAC"
-            )
+            self.log.debug("Device initialization incomplete: MAC is EMPTY_MAC")
             return
 
-        # Both model and MAC are valid, set the initialization event
-        self.log.debug(
-            "Device initialized: model=%s, MAC=%s",
-            self.model,
-            self.macaddress
-        )
+        self.log.debug("Device initialized: model=%s, MAC=%s", self.model, self.macaddress)
         self._deviceinfo_received.set()
 
     async def refresh_core(self) -> None:
-        """Query device for all attributes that exist regardless of power state.
-
-        This will force a refresh for all device queries that are valid to
-        request at any time.  It's the only safe suite of queries that we can
-        make if we do not know the current state (on or off+standby).
-
-        This does not return any data, it just issues the queries.
-        """
-        self.log.debug("Sending out core query for all attributes")
+        """Query device for all attributes that exist regardless of power state."""
+        self.log.debug("Sending core query for all attributes")
         for key in ATTR_CORE:
             if self.transport is None:
                 self.log.warning("Lost connection to receiver while refreshing device")
                 break
             self.query(key)
-            # small delay between command
             await asyncio.sleep(0.01)
 
     async def poweron_refresh(self) -> None:
@@ -376,19 +306,10 @@ class AVR(asyncio.Protocol):
             await self.poweron_refresh()
 
     async def refresh_all(self) -> None:
-        """Query device for all attributes that are known.
-
-        This will force a refresh for all device queries that the module is
-        aware of.  In theory, this will completely populate the internal state
-        table for all attributes.
-
-        This does not return any data, it just issues the queries.
-        """
+        """Query device for all known attributes."""
         self.log.debug("refresh_all")
-        # refresh main attribues
         await self.query_commands(LOOKUP)
         if self._model_series == MODEL_MDX:
-            # MDX receivers don't returns the list of available input numbers and have a fixed list
             self._populate_inputs(12)
 
     async def refresh_power(self) -> None:
@@ -424,11 +345,10 @@ class AVR(asyncio.Protocol):
     #
 
     def connection_made(self, transport: asyncio.Transport) -> None:
-        """Called when asyncio.Protocol establishes the network connection."""
+        """Called when network connection is established."""
         self.log.debug("Connection established to AVR")
         self.transport = transport
 
-        # self.transport.set_write_buffer_limits(0)
         limit_low, limit_high = self.transport.get_write_buffer_limits()
         self.log.debug("Write buffer limits %d to %d", limit_low, limit_high)
         self._poweron_refresh_successful = False
@@ -437,23 +357,22 @@ class AVR(asyncio.Protocol):
             zone.need_refresh = True
         asyncio.create_task(self.refresh_core())
 
+    def _append_to_buffer(self, data: bytes) -> None:
+        """Append data to buffer with overflow protection."""
+        self.buffer += data.decode('utf-8', errors='replace')
+        if len(self.buffer) > self._buffer_max_size:
+            self.log.warning(
+                "Buffer overflow: %d bytes (max %d), truncating",
+                len(self.buffer),
+                self._buffer_max_size
+            )
+            self.buffer = self.buffer[-self._buffer_max_size // 2:]
+
     def data_received(self, data: bytes) -> None:
-        """Called when asyncio.Protocol detects received data from network."""
+        """Handle received data from the device."""
         try:
-            # Decode with UTF-8 and replace errors to handle special characters
-            self.buffer += data.decode('utf-8', errors='replace')
             self.log.debug("Received %d bytes from AVR: %s", len(self.buffer), self.buffer)
-
-            # Check buffer size and handle overflow
-            if len(self.buffer) > self._buffer_max_size:
-                self.log.warning(
-                    "Buffer overflow: %d bytes (max %d), truncating old data",
-                    len(self.buffer),
-                    self._buffer_max_size
-                )
-                # Keep only the most recent data (half of max size)
-                self.buffer = self.buffer[-self._buffer_max_size // 2:]
-
+            self._append_to_buffer(data)
             asyncio.create_task(self._assemble_buffer())
         except Exception as error:
             self.log.error(
@@ -462,52 +381,33 @@ class AVR(asyncio.Protocol):
                 error,
                 exc_info=True
             )
-            # Continue operation after error - don't crash
 
     def connection_lost(self, exc: Exception | None) -> None:
-        """Called when asyncio.Protocol loses the network connection."""
+        """Called when network connection is lost."""
         self.log.warning("Lost connection to receiver")
-
-        if exc is not None:
+        if exc:
             self.log.debug(exc)
-
-        # Clear transport reference
         self.transport = None
-
         if self._connection_lost_callback:
             asyncio.create_task(self._connection_lost_callback())
 
     async def _assemble_buffer(self) -> None:
-        """Split up received data from device into individual commands.
-
-        Data sent by the device is a sequence of datagrams separated by
-        semicolons.  It's common to receive a burst of them all in one
-        submission when there's a lot of device activity.  This function
-        disassembles the chain of datagrams into individual messages which
-        are then passed on for interpretation.
-        """
+        """Split received data into individual commands."""
         try:
             self.transport.pause_reading()
-
             messages = self.buffer.split(";")
 
-            # Process all complete messages (all but the last element)
-            # The last element is either empty (if buffer ended with ';') or incomplete
             for message in messages[:-1]:
-                if message != "":
+                if message:
                     self.log.debug("assembled message %s", message)
                     await self._parse_message(message)
-                elif self._last_command != "":
-                    # For some case the receiver only send ; to confirm receiving previous command.
+                elif self._last_command:
                     last_command = self._last_command
                     self._last_command = ""
                     self.log.debug("send last command %s", last_command)
                     await self._parse_message(last_command)
 
-            # Preserve incomplete message (last element if not empty)
-            # If buffer ended with ';', messages[-1] will be empty string
             self.buffer = messages[-1]
-
             self.transport.resume_reading()
         except Exception as error:
             self.log.error(
@@ -516,28 +416,17 @@ class AVR(asyncio.Protocol):
                 error,
                 exc_info=True
             )
-            # Don't clear buffer on error - preserve partial messages for recovery
             if self.transport:
                 self.transport.resume_reading()
-        return
 
     def _populate_inputs(self, total: int) -> None:
-        """Request the names for all active, configured inputs on the device.
-
-        Once we learn how many inputs are configured, this function is called
-        which will ask for the name of each active input.
-        """
-        total = total + 1
-        for input_number in range(1, total):
+        """Request names for all active inputs."""
+        for input_number in range(1, total + 1):
             if self._model_series == MODEL_X40:
                 self.query(f"IS{input_number}IN")
                 self.query(f"IS{input_number}ARC")
-            else:
-                if (
-                    len(self._available_input_numbers) == 0
-                    or input_number in self._available_input_numbers
-                ):
-                    self.query(f"ISN{input_number:02d}")
+            elif not self._available_input_numbers or input_number in self._available_input_numbers:
+                self.query(f"ISN{input_number:02d}")
 
     async def _parse_message(self, data: str) -> None:
         """Interpret each message datagram from device and do the needful.

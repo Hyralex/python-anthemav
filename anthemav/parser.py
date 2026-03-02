@@ -24,28 +24,28 @@ def parse_x40_message(message: str) -> ParsedMessage | None:
 
 
 def parse_x40_input_message(message: str, command: str) -> ParsedMessage | None:
-    """Parse a message for a specific input on x40 models."""
+    """Parse a message for a specific input on x40 models.
+    
+    Raises ValueError for malformed IS messages to surface parsing issues.
+    """
     if not message or not command:
         return None
 
     if message.startswith("IS") and command in message and len(message) >= len(command) + 4:
-        try:
-            parsed_message = ParsedMessage()
-            command_position = message.index(command)
-            parsed_message.command = message[: command_position + len(command)]
+        parsed_message = ParsedMessage()
+        command_position = message.index(command)
+        parsed_message.command = message[: command_position + len(command)]
 
-            input_number_str = message[2:command_position]
-            if not input_number_str:
-                return None
+        input_number_str = message[2:command_position]
+        if not input_number_str:
+            raise ValueError(f"Invalid IS message format: missing input number in '{message}'")
 
-            parsed_message.input_number = int(input_number_str)
-            if parsed_message.input_number < 1 or parsed_message.input_number > 99:
-                return None
+        parsed_message.input_number = int(input_number_str)
+        if parsed_message.input_number < 1 or parsed_message.input_number > 99:
+            raise ValueError(f"Invalid input number {parsed_message.input_number} in '{message}'")
 
-            parsed_message.value = message[command_position + len(command) :]
-            return parsed_message
-        except (ValueError, IndexError, UnicodeError):
-            return None
+        parsed_message.value = message[command_position + len(command) :]
+        return parsed_message
     return None
 
 

@@ -235,6 +235,16 @@ class AVR(asyncio.Protocol):
         for key in LOOKUP:
             setattr(self, f"_{key}", "")
 
+    def _call_soon(self, callback: Callable, *args) -> None:
+        """Schedule a callback to be called soon on the event loop."""
+        loop = asyncio.get_running_loop()
+        loop.call_soon(callback, *args)
+
+    def _call_later(self, delay: float, callback: Callable, *args) -> None:
+        """Schedule a callback to be called after a delay."""
+        loop = asyncio.get_running_loop()
+        loop.call_later(delay, callback, *args)
+
     async def wait_for_device_initialised(self, timeout: float) -> None:
         """Wait for device initialization (model and MAC address).
 
@@ -552,25 +562,26 @@ class AVR(asyncio.Protocol):
                     )
                     newdata = True
             else:
-                # use parser for other commands
-                parsed_message = parse_message(data)
-                if parsed_message is not None:
-                    recognized = True
-                    oldvalue = self.values.get(parsed_message.command)
-                    if parsed_message.value != oldvalue:
-                        newdata = True
-                        self.values[parsed_message.command] = parsed_message.value
-                        self.log.debug(
-                            "New value - command:%s value:%s input_number:%s",
-                            parsed_message.command,
-                            parsed_message.value,
-                            parsed_message.input_number,
-                        )
+                try:
+                    parsed_message = parse_message(data)
+                    if parsed_message is not None:
+                        recognized = True
+                        oldvalue = self.values.get(parsed_message.command)
+                        if parsed_message.value != oldvalue:
+                            newdata = True
+                            self.values[parsed_message.command] = parsed_message.value
+                            self.log.debug(
+                                "New value - command:%s value:%s input_number:%s",
+                                parsed_message.command,
+                                parsed_message.value,
+                                parsed_message.input_number,
+                            )
+                except ValueError as e:
+                    self.log.warning("Parse error: %s", e)
 
         if newdata:
             if self._update_callback:
-                loop = asyncio.get_running_loop()
-                loop.call_soon(self._update_callback, data)
+                self._call_soon(self._update_callback, data)
         else:
             self.log.debug("no new data encountered")
 
@@ -604,8 +615,7 @@ class AVR(asyncio.Protocol):
                             # all zone are off, switch off device
                             self.power_off_device()
                 if newdata and zoneCommand == "INP":
-                    loop = asyncio.get_running_loop()
-                    loop.call_later(2, lambda: asyncio.create_task(self.refresh_input()))
+                    self._call_later(2, lambda: asyncio.create_task(self.refresh_input()))
                 break
 
         return newdata
@@ -621,8 +631,7 @@ class AVR(asyncio.Protocol):
         self.log.debug("Powered on device detected refresh all attributes")
         self._device_power = True
         self._poweron_refresh_successful = False
-        loop = asyncio.get_running_loop()
-        loop.call_later(1, lambda: asyncio.create_task(self.poweron_refresh()))
+        self._call_later(1, lambda: asyncio.create_task(self.poweron_refresh()))
 
     async def refresh_input(self) -> None:
         """Refresh specific input commands."""
@@ -643,8 +652,7 @@ class AVR(asyncio.Protocol):
             self._force_refresh = True
             self.log.debug("Force refresh Power State")
             await self.refresh_power()
-            loop = asyncio.get_running_loop()
-            loop.call_later(2, setattr, self, "_force_refresh", False)
+            self._call_later(2, setattr, self, "_force_refresh", False)
 
     def query(self, item: str) -> None:
         """Issue a raw query to the device for an item.

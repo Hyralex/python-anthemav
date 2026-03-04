@@ -4,7 +4,6 @@ from anthemav import AVR
 from unittest.mock import call, patch
 
 
-@pytest.mark.asyncio
 class TestProtocol:
     def test_default_alm_list(self):
         avr = AVR()
@@ -13,6 +12,7 @@ class TestProtocol:
         assert almList is not None
         assert len(almList) == 15
 
+    @pytest.mark.asyncio
     async def test_restricted_alm_list(self):
         avr = AVR()
         await avr._parse_message("IDMMRX 520")
@@ -31,9 +31,10 @@ class TestProtocol:
         for alm in list(LOOKUP["Z1ALM"].values())[1:]:
             assert alm in ALM_NUMBER_x20
 
+    @pytest.mark.asyncio
     async def test_power_on_force_refresh(self):
         avr = AVR()
-        with patch.object(avr, "query") as mock, patch.object(avr, "_loop"):
+        with patch.object(avr, "query") as mock:
             await avr._parse_message("Z1AIC;")
             mock.assert_called_once_with("Z1POW")
 
@@ -60,15 +61,17 @@ class TestProtocol:
             mock.assert_any_call("IS2IN")
             mock.assert_any_call("IS2ARC")
 
+    @pytest.mark.asyncio
     async def test_parse_input_x40(self):
         avr = AVR()
         with patch.object(avr, "query"):
             await avr._parse_message("IS3INName")
             assert avr._input_names.get(3, "") == "Name"
 
+    @pytest.mark.asyncio
     async def test_parse_arc_x40(self):
         avr = AVR()
-        with patch.object(avr, "query"), patch.object(avr, "_loop"):
+        with patch.object(avr, "query"):
             avr.set_model_command("MRX 1140")
             avr.zones[1].input_number = 2
             await avr._parse_message("Z1INP2")
@@ -76,6 +79,7 @@ class TestProtocol:
             await avr._parse_message("IS1ARC0")
             assert avr.arc is True
 
+    @pytest.mark.asyncio
     async def test_parse_arc_x20(self):
         avr = AVR()
         with patch.object(avr, "query"):
@@ -83,6 +87,7 @@ class TestProtocol:
             await avr._parse_message("Z1ARC1")
             assert avr.arc is True
 
+    @pytest.mark.asyncio
     async def test_set_arc_x20(self):
         avr = AVR()
         avr._device_power = True
@@ -91,12 +96,13 @@ class TestProtocol:
             avr.arc = True
             mock.assert_called_once_with("Z1ARC1")
 
+    @pytest.mark.asyncio
     async def test_set_arc_x40(self):
         avr = AVR()
         avr._device_power = True
         with patch.object(avr, "query"), patch.object(
             avr, "command"
-        ) as mock, patch.object(avr, "_loop"):
+        ) as mock:
             avr.set_model_command("MRX 1140")
             await avr._parse_message("Z1INP3")
             avr.arc = True
@@ -113,12 +119,14 @@ class TestProtocol:
             ("MDA16", 8),
         ],
     )
+    @pytest.mark.asyncio
     async def test_zone_created(self, model: str, zone: int):
         avr = AVR()
         with patch.object(avr, "query"):
             await avr._parse_message(f"IDM{model}")
             assert len(avr.zones) == zone
 
+    @pytest.mark.asyncio
     async def test_power_refreshed_MDX16(self):
         avr = AVR()
         with patch.object(avr, "query") as mock:
@@ -127,6 +135,7 @@ class TestProtocol:
                 mock.assert_any_call(f"Z{zone}POW")
             assert call("Z9POW") not in mock.mock_calls
 
+    @pytest.mark.asyncio
     async def test_input_name_queried_for_MDX16(self):
         avr = AVR()
         with patch.object(avr, "query") as mock, patch.object(avr, "transport"):
@@ -135,6 +144,7 @@ class TestProtocol:
             for input_number in range(1, 13):
                 mock.assert_any_call(f"ISN{input_number:02d}")
 
+    @pytest.mark.asyncio
     async def test_input_name_queried_for_MDX8(self):
         avr = AVR()
         with patch.object(avr, "query") as mock, patch.object(avr, "transport"):
@@ -146,6 +156,7 @@ class TestProtocol:
                 else:
                     assert call(f"ISN{input_number:02d}") not in mock.mock_calls
 
+    @pytest.mark.asyncio
     async def test_pvol_x40(self):
         avr = AVR()
         with patch.object(avr, "query"):
@@ -153,11 +164,10 @@ class TestProtocol:
             await avr._parse_message("Z2PVOL51")
             assert avr.zones[2].volume == 51
 
+    @pytest.mark.asyncio
     async def test_zone2_power(self):
         avr = AVR()
-        with patch.object(avr, "refresh_zone") as refreshmock, patch.object(
-            avr, "_loop"
-        ):
+        with patch.object(avr, "refresh_zone") as refreshmock:
             await avr._parse_message("IDMMRX 740")
             assert avr.zones[2].power is False
             await avr._parse_message("Z2POW1")
@@ -165,6 +175,7 @@ class TestProtocol:
             assert avr.zones[2].power is True
             assert avr._device_power is True
 
+    @pytest.mark.asyncio
     async def test_attenuation(self):
         avr = AVR()
         avr._device_power = True
@@ -174,6 +185,7 @@ class TestProtocol:
             await avr._parse_message("Z1VOL-42")
             assert avr.zones[1].attenuation == -42
 
+    @pytest.mark.asyncio
     async def test_volume_x20(self):
         avr = AVR()
         avr._device_power = True
@@ -183,6 +195,7 @@ class TestProtocol:
             await avr._parse_message("Z1VOL-42")
             assert avr.zones[1].volume == 53
 
+    @pytest.mark.asyncio
     async def test_zone_set_volume_as_percentage_x20(self):
         avr = AVR()
         avr._device_power = True
@@ -192,6 +205,7 @@ class TestProtocol:
             avr.zones[1].volume_as_percentage = 0.53
             mock.assert_any_call("Z1VOL-42")
 
+    @pytest.mark.asyncio
     async def test_set_volume_as_percentage_x20(self):
         avr = AVR()
         avr._device_power = True
@@ -201,6 +215,7 @@ class TestProtocol:
             avr.volume_as_percentage = 0.53
             mock.assert_any_call("Z1VOL-42")
 
+    @pytest.mark.asyncio
     async def test_set_volume_as_percentage_x40(self):
         avr = AVR()
         avr._device_power = True
@@ -209,6 +224,7 @@ class TestProtocol:
             avr.volume_as_percentage = 0.53
             mock.assert_any_call("Z1PVOL53")
 
+    @pytest.mark.asyncio
     async def test_set_volume_as_percentage_mdx(self):
         avr = AVR()
         avr._device_power = True
@@ -217,6 +233,7 @@ class TestProtocol:
             avr.volume_as_percentage = 0.53
             mock.assert_any_call("Z1VOL53")
 
+    @pytest.mark.asyncio
     async def test_refresh_zone_x40(self):
         avr = AVR()
         with patch.object(avr, "query") as mock, patch.object(avr, "transport"):
@@ -228,6 +245,7 @@ class TestProtocol:
             mock.assert_any_call("Z2VOL")
             mock.assert_any_call("Z2MUT")
 
+    @pytest.mark.asyncio
     async def test_refresh_zone_x20(self):
         avr = AVR()
         with patch.object(avr, "query") as mock, patch.object(avr, "transport"):
@@ -239,11 +257,10 @@ class TestProtocol:
             mock.assert_any_call("Z2MUT")
             assert call("Z2PVOL") not in mock.mock_calls
 
+    @pytest.mark.asyncio
     async def test_device_power_off(self):
         avr = AVR()
-        with patch.object(avr, "refresh_zone") as refreshmock, patch.object(
-            avr, "_loop"
-        ):
+        with patch.object(avr, "refresh_zone") as refreshmock:
             await avr._parse_message("IDMMRX 740")
             await avr._parse_message("Z2POW1")
             refreshmock.assert_called_with(2)
@@ -255,6 +272,7 @@ class TestProtocol:
             await avr._parse_message("Z2POW0")
             assert avr._device_power is False
 
+    @pytest.mark.asyncio
     async def test_zone_input_format_mrx(self):
         avr = AVR()
         avr._model_series = "x40"
@@ -269,6 +287,7 @@ class TestProtocol:
         avr._device_power = True
         assert avr.zones[1].input_format == ""
 
+    @pytest.mark.asyncio
     async def test_input_format_mrx_zone2(self):
         avr = AVR()
         avr._model_series = "x40"
@@ -281,6 +300,7 @@ class TestProtocol:
     @pytest.mark.parametrize(
         "model,expected", [("MRX 520", True), ("MRX 740", True), ("MDX-8", False)]
     )
+    @pytest.mark.asyncio
     async def test_support_zone1_MRX(self, model: str, expected: bool):
         avr = AVR()
         with patch.object(avr, "query"):
@@ -294,6 +314,7 @@ class TestProtocol:
     @pytest.mark.parametrize(
         "model,expected", [("MRX 520", True), ("MRX 1140", False), ("MDX8", False)]
     )
+    @pytest.mark.asyncio
     async def test_support_attenuation(self, model: str, expected: bool):
         avr = AVR()
         with patch.object(avr, "query"):

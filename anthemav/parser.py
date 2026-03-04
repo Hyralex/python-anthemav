@@ -1,42 +1,54 @@
-"""Module containing the parser for Anthem command."""
+"""Module containing the parser for Anthem commands."""
 
 
 class ParsedMessage:
-    """Class containing parsed message information."""
+    """Parsed message information."""
 
     command: str
     value: str
     input_number: int
 
 
-def parse_message(message: str) -> ParsedMessage:
-    """Try to parse a message to a ParsedMessage object."""
+def parse_message(message: str) -> ParsedMessage | None:
+    """Parse a message to a ParsedMessage object."""
+    if not message:
+        return None
     return parse_x40_message(message)
 
 
-def parse_x40_message(message: str) -> ParsedMessage:
-    """Try to parse a message for the x40 models."""
+def parse_x40_message(message: str) -> ParsedMessage | None:
+    """Parse a message for x40 models."""
+    if not message:
+        return None
     return parse_x40_input_message(message, "ARC")
 
 
-def parse_x40_input_message(message: str, command: str) -> ParsedMessage:
-    """Try to parse a message associated to a specific input for the x40 models."""
-    if (
-        message.startswith("IS")
-        and command in message
-        and len(message) >= len(command) + 4
-    ):
+def parse_x40_input_message(message: str, command: str) -> ParsedMessage | None:
+    """Parse a message for a specific input on x40 models.
+    
+    Raises ValueError for malformed IS messages to surface parsing issues.
+    """
+    if not message or not command:
+        return None
+
+    if message.startswith("IS") and command in message and len(message) >= len(command) + 4:
         parsed_message = ParsedMessage()
         command_position = message.index(command)
-        parsed_message.command = message[0 : command_position + len(command)]
-        parsed_message.input_number = int(message[2:command_position])
+        parsed_message.command = message[: command_position + len(command)]
+
+        input_number_str = message[2:command_position]
+        if not input_number_str:
+            raise ValueError(f"Invalid IS message format: missing input number in '{message}'")
+
+        parsed_message.input_number = int(input_number_str)
+        if parsed_message.input_number < 1 or parsed_message.input_number > 99:
+            raise ValueError(f"Invalid input number {parsed_message.input_number} in '{message}'")
+
         parsed_message.value = message[command_position + len(command) :]
         return parsed_message
     return None
 
 
-def get_x40_input_command(self, input_number: int, command: str) -> str:
+def get_x40_input_command(input_number: int, command: str) -> str | None:
     """Return a formatted message for a specific input."""
-    if input_number > 0:
-        return f"IS{self.input_number}{command}"
-    return None
+    return f"IS{input_number}{command}" if input_number > 0 else None

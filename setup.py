@@ -11,7 +11,7 @@ def readme():
 
 setup(
     name="anthemav",
-    version="1.4.2",
+    version="1.5.0",
     author="David McNett",
     author_email="nugget@macnugget.org",
     url="https://github.com/nugget/python-anthemav",
@@ -20,12 +20,15 @@ setup(
     scripts=[],
     description="Python API for controlling Anthem Receivers",
     long_description=readme(),
+    python_requires=">=3.13",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.13",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     include_package_data=True,

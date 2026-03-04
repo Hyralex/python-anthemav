@@ -1,1 +1,1 @@
-asyncio
+# No external dependencies required for runtime

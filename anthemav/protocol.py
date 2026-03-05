@@ -680,7 +680,9 @@ class AVR(asyncio.Protocol):
         self._model = detect_model(model)
         if self._model is None:
             self.log.warning("Unknown model: %s, defaulting to x20", model)
-            self._model = detect_model("MRX 520")
+            # Direct fallback to x20 model for unknown models
+            from anthemav.models.x20 import X20Model
+            self._model = X20Model()
         
         self.log.debug("Detected model series: %s", self._model.model_series)
         

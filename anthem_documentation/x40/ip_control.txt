@@ -1,0 +1,90 @@
+Anthem MRX x10 series, MRX x20 series, and AVM 60 IP protocol																				
+																				
+To communicate with the system via the network:																				
+1. Unit must first be powered on.  If 'IP control in standby' is enabled in the setup menu, it will enable IP control as soon as possible after AC power is connected.																				
+2. The IP address of the unit must be known, either through the device discovery process described below, or through a static IP (setup menu setting).																				
+3. A TCP/IP connection to the unit must be established on the defined port (setup menu setting).																				
+4. The system will treat the data coming across the TCP/IP link as if it were coming accoss the RS-232 port (all RS232 serial commands can be sent over the TCP/IP socket).																				
+5. If the system has exceeded the maximum number of simultaneous connections it will forcibly close the oldest connection.																				
+																				
+Device Discovery:																				
+																				
+DDP (Device Discovery Packet) version 1:																				
+offset	0	1	2	3	4	5	6	7	8	9	10	11	12	13	14	15				
+	80 'P'	65 'A'	82 'R'	67 'C'	0	0	announce	1	version				tcp_ip_port							
+	device_name[0-15]																			
+	model_name[0-15]																			
+	serial_number[0-15]																			
+																				
+																				
+	Description																			
+	announce		If this bit is set then any Anthem product that receives the packet will broadcast its own copy of this packet with the appropriate parameters set.																	
+	version		current packet version																	
+	tcp_ip_port		the port that the system will listen on for incoming TCP connections																	
+	device_name		device name as defined by the user in the setup menu																	
+	model_name		model name - this string should be the same as what is returned when the device receives a IDM? query (Ex: 'MRX 710' or 'MRX 510' etc)																	
+	serial_number		MAC address																	
+																				
+	Notes: 																			
+	All values are sent in network order																			
+	The DD packet is broadcast on the local subnet each time a device establishes a network connection.																			
+	The DD packet is broadcast on the local subnet each time the system will be shutting down and losing the network connection.																			
+		-> in this case the off byte will be set to 1																		
+	Every time the system receives a valid DD packet with 'announce' set to 1 it will respond by broadcasting another DD packet on the local subnet.																			
+	Unused bits/bytes are filled with 0's.																			
+	device_name, model_name and serial_number are not necessarily null terminated C-Style strings.																			
+		-> code using these strings should not assume that the last byte is a null																		
+																				
+Microsoft VC++ structure definition																				
+																				
+	#pragma pack(push,1)																			
+	struct device_descriptor_t																			
+	{																			
+		__int8	unique_header[0x4];																	
+		__int8	reserved1_rw0;																	
+		__int8	reserved2_rw0;																	
+		__int8	announce;																	
+		__int8	powering_off;																	
+		__int32	version;																	
+		__int32	tcp_ip_port;																	
+		__int8	device_name[0x10];																	
+		__int8	model_name[0x10];																	
+		__int8	serial_number[0x10];																	
+																				
+		void hton() {																		
+			version = htonl(version);																	
+			tcp_ip_port = htonl(tcp_ip_port);																	
+		}																		
+																				
+		void ntoh() {																		
+			version = ntohl(version);																	
+			tcp_ip_port = ntohl(tcp_ip_port);																	
+		}																		
+	};																			
+	#pragma pack(pop)																			
+																				
+GCC structure definition																				
+																				
+	struct device_descriptor_t																			
+	{																			
+		int8_t	unique_header[0x4];																	
+		int8_t	reserved1_rw0;																	
+		int8_t	reserved2_rw0;																	
+		int8_t	announce;																	
+		int8_t	powering_off;																	
+		int32_t	version;																	
+		int32_t	tcp_ip_port;																	
+		int8_t	device_name[0x10];																	
+		int8_t	model_name[0x10];																	
+		int8_t	serial_number[0x10];																	
+																				
+		void hton() {																		
+			version = htonl(version);																	
+			tcp_ip_port = htonl(tcp_ip_port);																	
+		}																		
+																				
+		void ntoh() {																		
+			version = ntohl(version);																	
+			tcp_ip_port = ntohl(tcp_ip_port);																	
+		}																		
+	} __attribute__ ((__packed__));																			

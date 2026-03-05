@@ -1,0 +1,282 @@
+Anthem MDX Distribution Amplifier Serial Commands,,,,
+Revision 11,,,,
+Date: 25/10/2019,,,,
+,,,,
+Command,Description,Related Query Command,Asychronous Notification,
+;,(semicolon) Command separator/terminator - note that semicolon is the only valid line feed.,there will be a semicolon at the end of a query,,
+comment,"Upper case letters represent command, lower case represent variables which must be entered.",,,
+,,,,
+,,,,
+Zone Specific Commands,,,,
+Zones - Settings,"""Zx"" at the beginning of a command represents zone selection.
+  MDX-16: x=1 to 8
+  MDX-8: x = 1 to 4",,,
+ZxPOWy,"Set zone x power. 
+x=zone: 0 (all), 1=zone 1 ../. 8=zone 8 
+to y: 
+  0=off
+  1=on
+  t=toggle. 
+When unit is in 1/2W standby mode, it may be necessary to send the power-on command twice. Ex:""Z0POW1;Z0POW1;"". The first instance is the wake-up from low-power state. Note that Zx=Z0 applies only to power command.","ZxPOW? returns ZxPOWy
+
+Z0POW? returns ZxPOWy for all zones (Z1POWy;Z2POWy;Z3PO…;Z8POWy;)",YES,
+ZxARCVAL?,"Query if ARC (Anthem Room Correction) is valid for zone x
+  0=invalid
+  1=valid.",ZxARCVAL? returns ZxARCVALy (y=0-1),,
+ZxARCENy,"Turn ARC (Anthem Room Correction) in zone x to y:
+  0=off
+  1=on
+Returns an error if an attempt to turn it on is made when there are no ARC co-efficients available.",ZxARCEN? returns ZxARCENy (y=0-1),YES,
+ZxNAMyyyyyyyyyyyyyyyy,"Set zone name: yyyyyyyyyyyyyyyy=name. 
+Maximum length of the zone name is 16 ASCII characters. 
+Note that the character "";"" is prohibited as it is used as a terminator.",ZxNAM? returns ZxNAMyyyyyyyyyyyyyyyy,YES,
+ZxINPnn,"Input Select: nn=input number. 
+  01=Analog 1, 02=Analog 2, ... 08=Analog 8
+  09=Digital 1 ... 12=Digital 4.
+MDX-8 supports only input 01, 02, 03, 04 and 09.","ZxINP? returns ZxINPnn  e.g. ""Z1INP01"".",YES,
+ZxIPMy,"Set zone x listening mode 
+  y=s for stereo
+  y=m for mono (l+r)
+  y=l for left only
+  y= r for right only
+Must be set to stereo when stereo bridge mode is required.
+Must be set to mono when mono bridge mode is required.",ZxIPM? returns ZxIPMy,YES,
+ZxSPKbbllmm,"Set speaker profile of zone x to brand bb, line ll, model mm. 
+Numbers start at 01.","ZxSPK? returns ZxSPKbbllmm. If there is no speaker assigned ( i.e. generic), it will return ZxSPK010101",,
+ZxSPENy,"Speaker profile enable
+  y=0 don't use speaker model profile
+  y=1 apply current speaker model profile",ZxSPEN? returns ZxSPENy,,
+"Zones -
+Volumes",,,,
+ZxVOLyy.y,"Volume setting: yyy.y=value (0.0 to 100.0). If setting integer values, it is not necessary to include the decimal. 
+Example: Z1VOL35 represents zone 1 volume set to 35.  Entry is rounded to nearest valid value.",ZxVOL? returns ZxVOLyyy.y,YES,
+ZxVUPyy.y,"Volume up: yy.y=dB step: 0.0 to 10.0, m=minimum (0.5 dB). 
+Entry is rounded to nearest valid value",,YES (ZxVOLyy.y),
+ZxVDNyy.y,"Volume down: yy.y=dB step: 0.0 to 10.0, m= minimum (0.5 dB). 
+Entry is rounded to nearest valid value.",,YES (ZxVOLyy.y),
+ZxMUTy,"Mute: 
+  0=unmute
+  1=mute
+  t=toggle",ZxMUT? returns ZxMUTy (y=0-1),YES,
+ZxPOVyyy.y,Power On volume setting: yyy.y=value (0.0 to 100.0).  Example: Z1POV35 represents zone 1 power-up volume set to 35.  Entry is rounded to nearest valid value.,ZxPOV? returns ZxPOVyyy.y,YES,
+ZxMXVyyy.y,Maximum volume setting: yyy.y=value (0.0 to 100.0).  Example: Z1MXV75 represents zone 1 max volume set to 75.  Entry is rounded to nearest valid value.,ZxMXV? returns ZxMXVyyy.y,YES,
+ZxOFFyy.y,"Zone level offset. yyy.y=value (-12.0 to +6.0 [dB] in 0.5 dB steps, default 0.0)",ZxOFF? returns ZxOFFyy.y,YES,
+Zones -Tone/Balance,,,,
+ZxTONyszz.z,"Tone setting: 
+  y=0 bass
+  y=1 treble  
+  s=sign: +/- 
+  zz.z=value  
+Range: -10.0 to +10.0 (step size of 0.5 dB)
+Example: Z1TON0-01 represents a bass cut by 1 dB. ",ZxTONy? returns ZxTONyszz.z,YES,
+ZxTUPyzz.z,"Tone up: 
+  y=0 bass
+  y=1 treble
+  zz.z=dB step
+Range: 0.5 to 10.0 (step size of 0.5 dB)",,YES (ZxTONyzz.z),
+ZxTDNyzz.z,"Tone down: 
+  y=0 bass
+  y=1 treble
+ zz.z=dB step
+Range: 0.5 to 10.0 (step size of 0.5 dB)",,YES (ZxTONyzz.z),
+ZxSLOcsyy.y,"Set the speaker channel 'c' (Table 2) to have a level offset 'syy.y'. s=sign: +/-, yy.y= dB value. 
+Range -12.0 to 12.0",ZxSLOc? Returns ZxSLOcsyy.y,YES,
+"Zones -  
+Info",,,,
+ZxAIF?,"Query audio input format: 
+  0=no input (if digital)
+  1=Analog
+  2= PCM
+  10= unsupported
+Unsupported format will be reported if a Dolby or DTS stream is detected.",Returns ZxAIFyy,,
+ZxSRT?,Query audio input sampling rate (kHz),"Returns ZxSRTxxx, 0=no digital input",,
+Zones - Subwoofer,,,,
+ZxSUBy,"For the specified zone x, set the sub mode y to:
+  0=disabled
+  1=enabled
+  t=toggle",ZxSUB? returns ZxSUBm,YES,
+ZxXOVyyy,"For the specified zone x, set the crossover 'yyy' (0=Off/Bypass (fullrange speaker/Sub), 40=40Hz, 50=50Hz, 60=60Hz, etc..)
+yyy should be between 20 and 180 Hz (in 1 Hz increment)",ZxXOV? Returns ZxXOVyyy,YES,
+ZxSPHppp,"For the specified zone x, set sub phase to 'ppp' (0 - 180) degrees",ZxSPH? Returns ZxSPHppp,YES,
+ZxSPOp,"For the specified zone x, set the sub polarity to 'p' 
+  0=normal
+  1=inverted",ZxSPO? Returns ZxSPOp,YES,
+Zones - Bridge Mode,,,,
+ZxBRGy,"0=not bridged, 1=bridged. Set listening mode to stereo or mono depending on desired mode of operation.",ZxBRG? returns ZxBRGy,YES,
+,,,,
+ZxBSUBy,"Works only on odd numbered zones. 0 = normal, 1 = Use the bridged output of the next zone as the sub output.",ZxBSUB? Returns ZxBSUBy,YES,
+,,,,
+,,,,
+Input Specific Commands,,,,
+Inputs,Input numbers start at 1,,,
+IPTnnsyy.y,"Set trim level of specified Input.
+  nn=input number
+  s=sign: +/-
+  yy.y=value
+Example: IPT08-3.5 represents analog input 8 trim set to -3.5 dB.  Entry is rounded to nearest valid value. Range -20.0 to 20.0 dB",IPTnn? Returns IPTnnsyy.y,YES,
+ISNnnyyyyyyyyyyyyyyyy,"Set input name nn=input number, yyyyyyyyyyyyyyyy=name. Maximum length of the input name is 16 ASCII characters. Eg. ISN02Analog1. Note that the character "";"" is prohibited as it is used as a terminator.",ISNnn? returns 'ISNnnyyyyyyyyyyyyyyyy',YES,
+,,,,
+,,,,
+Preferences Commands,,,,
+AFDy,"Set Auto Off Delay: 
+  0=disabled (no auto off) 
+  1=5 minutes
+  2=10 minutes
+  3=20 minutes
+  4=1 hour
+  5=2 hours
+  6=6 hours",AFD? Returns AFDy,YES,
+AODyy,Set Auto On Delay: 0-20 seconds,AOD? Returns AODy,YES,
+FPBx,"Set front panel brightness: 
+  0=off
+  1=dim
+  2=high
+  n=cycle to next",FPB? returns FPBx (x=0-2),YES,
+,,,,
+,,,,
+Unit Information Commands,,,,
+IDM?,Query model name,"returns IDM followed by model e.g. ""IDMMDX-8""",,
+DNMyyyyyyyyyyyyyyyy,"Device name: yyyyyyyyyyyyyyyy is a name of up to 16 characters. 
+Semi-colon is NOT a valid character (as it is used as a terminator).",DNM? Returns DNMyyyyyyyyyyyyyyyy,YES,
+IDS?,Query firmware version,"returns IDS followed by software version e.g. ""IDS0.1.4931""",,
+GSN?,Get the serial number of the unit.,returns GSN followed by the serial number (up to 15 characters),,
+IDQ?,Query model and firmware version,"returns IDQ followed by model, software version, region, software build date e.g. ""IDQMDX16 0.1.4931 12/19/18 08:49""",,
+IBL?,"Query bootloader version, build date, build time",returns IBL followed by the information. E.g.IBLv0.2.8491 2019/03/13 12:00:05;,,
+IDB?,Query software build date,"returns IDB followed by software build date e.g. ""IDB12/19/16""",,
+IDH?,Query hardware version,"returns IDH followed by hardware version e.g. ""IDH3""",,
+MOD?,Query operational mode set by the ON MODE switch at the back of the unit.,"returns MOD followed by:
+  0 for Audio Detect
+  1 for Trigger
+  2 for Ext. Command.",,
+SPB?,Query number of speaker brands,returns SPB followed by the number of speaker brands.,,
+SPBbb?,Query name of brand number bb.,returns SPBbb followed by name of brand,,
+SPLbb?,Query number of speaker lines in brand bb,returns SPLbb followed by the number of speaker lines in the brand.,,
+SPLbbll?,Query name of line number ll in brand number bb.,returns SPLbbll followed by name of the line,,
+SPMbbll?,Query number of speaker models in line ll in brand bb,returns SPMbbll followed by the number of speaker models in that line in the brand.,,
+SPMbbllmm?,Query name of model number mm in line ll in brand number bb.,returns SPMbbllmm followed by name of the model,,
+,,,,
+,,,,
+Network Commands,,,,
+IPMy,"Set IP mode to:
+  0=DHCP
+  1=manual",IPM? returns IPMy,,
+IPAyyy.yyy.yyy.yyy,IP Address This is only valid if IP mode is manual,IPA? returns IPAyyy.yyy.yyy.yyy,,
+SNMyyy.yyy.yyy,Subnet Mask. This is only valid if IP mode is manual.,SNM? returns SNMyyy.yyy.yyy,,
+IPGyyy.yyy.yyy.yyy,IP Gateway This is only valid if IP mode is manual,IPG? returns IPGyyy.yyy.yyy.yyy,,
+MAC?,Query MAC Address,"returns MAC followed by MAC address e.g. ""MAC7CB77B000353;""",,
+,,,,
+,,,,
+Store/Load Commands,,,,
+LSTy,"Load current settings with:
+  u=user settings
+  i=installer settings
+  f=factory defaults","LSTy? Returns LSTya where 
+  a=0 means there are none saved 
+  a=1 means that settings are available",,
+SSTy,"Save current settings as
+  u=user settings
+  i=installer settings
+  c=current (The MDX periodically checks current settings to see if any settings have changed and does a save if they have. The SSTc command forces a save.)",,,
+,,,,
+,,,,
+Global Commands,,,,
+GMUTy,"Global Mute where y 
+  0=unmute
+  1=mute
+  t=toggle",GMUT? returns GMUTy (y=0-1),YES,
+DOSn,"Set the digital output source of the MDX-16 to n: 1=Digital 1, 2=Digital 2, 
+3=Digital 3, 4=Digital 4",DOS? returns DOSn,YES,
+,,,,
+,,,,
+Diagnostics Commands,,,,
+UIDx,"Unit ID 
+  0=off
+  1=rear LED on
+  2=rear LED flash
+  3=rear and power LEDs flash",UID? returns UIDx,YES,
+FAN?,Query fan speed.,returns FAN followed by the curent fan speed in RPM,,
+SFSyyy,Set fan speed 0-100,,,
+PSV?,Query power supply Voltage.,returns PSVpyy.ynyy.y - (p)ositive (n)egative voltages yy.y,,
+PST?,Query power supply temperature.,returns PST followed by the temperature in Celcius,,
+ZxTMP?,Get AMP Temperature for specified zone.,Returns ZxTMPyyy in Celcius,,
+ZxSTAT?,Query Status,Returns ZxSTATyy with hexadecimal bitmask yy which is the bitwise OR of each error as specified in the 'Error Bits Definition' - table 3 below. Ex: 10 would be short detected.,,
+ZxECNTy?,Query error count: y selects the count to query - see Table 4: 'Error Count definition'.,Returns ZxECNTyn where n is the error count.,,
+CERC,Clear the error counts.,,,
+,,,,
+,,,,
+Sample Command Strings,,,,
+"Turn ON zone 3: Z3POW1;
+Select digital 1 as the source for zone 5: Z5INP09;
+Set volume on zone 2 to 52: Z2VOL52;
+Increase volume on zone 7 by 1.5 dB: Z7VUP01.5;
+Select analog 1 for zone 1, 3, 4 and 6: Z1INP01;Z3INP03;Z4INP01;Z6INP01;
+Mute all zones: GMUT1;
+Turn OFF all zones: Z0POW0;",,,,
+,,,,
+,,,,
+Notes,,,,
+1. Successful serial commands return ';' after the action is completed.,,,,
+"2. When a recognized command cannot be executed ""!E<OriginalCommand>"" is returned. Ex: Analog 5 is selected on the 4-zone amp (which does not exist) by sending the command ""Z1INP5;"", then the system would return ""!EZ1INP5;"". ",,,,
+"3. Out-of-range parameters return the message ""!E<OriginalCommand>"". Ex: 'Z1VOL101;' would result in a response: '!EZ1VOL101;'",,,,
+"4. Invalid commands return the message ""!I<OriginalCommand>"". Ex 'HELLO;' would result in a response '!IHELLO;'",,,,
+"5. Receiving a command for a zone when the zone is off (but the system is not in standby), returns the message ""!Z<OriginalMessage>"".",,,,
+"6. Ony a few commands are valid when the system is in standby such as 'IDM?', 'ZxPOWy', 'ZxPOW?'. All other commands are considered 'Invalid'.",,,,
+7. Maximum command length is 256 bytes including the terminator. Maximum response length is 258 bytes.,,,,
+8. Average command processing latency is less than 30 ms.,,,,
+9. Individual commands have a maximum processing latency of 100 ms.,,,,
+10. Systems that communicate over RS232 should wait for at least 1 s for a response before retransmission,,,,
+"11. Control system should behave as a ""good citizen"" and try to minimize the amount of redundant control commands. For example, in the case of a volume slider, not every intermediate/temporary volume settings need to be sent (Z1VOL52;Z1VOL54;Z1VOL56; is preferable and is equivalent to Z1VOL50;Z1VOL51;Z1VOL52;Z1VOL53;Z1VOL54;Z1VOL55;Z1VOL56;)",,,,
+12. A websocket connection can be established using the following javascript snippet: var socket = new WebSocket('ws://' + ip + '/cmd');,,,,
+13. Optionnally you can discover supported devices using the discovery protocol outline in the Discovery Protocol tab.,,,,
+14. A TCP/IP connection to the unit must be established on port 14999.,,,,
+"15. We are regularly testing 4 simultaneous ""good citizen"" control connections. ",,,,
+,,,,
+,,,,
+,Table 1. Speaker Combination,,,
+0,Fronts,,,
+4,Subwoofers,,,
+,,,,
+,,,,
+,Table 2. Channel Definition,,,
+0,Subwoofer,,,
+2,Front Right,,,
+3,Front Left,,,
+,,,,
+,,,,
+xxxx (hex),Table 3. Error Bits Definition,,,
+bit 0 (0x1),DC Fault,,,
+bit 1 (0x2),HF Detect,,,
+bit 2 (0x4),Thermal Foldback,,,
+bit 3 (0x8),Over Temperature,,,
+bit 4 (0x10),AMP Protect,,,
+,,,,
+,,,,
+xxxx (hex),Table 4. Error Count Definition,,,
+0,DC Fault,,,
+1,HF Detect,,,
+2,Thermal Foldback,,,
+3,Over Temperature,,,
+4,AMP Protect,,,
+,,,,
+,,,,
+xxxx (hex),Table 5. Channel Bits Definition,,,
+bit 0 (0x1),Front Left,,,
+bit 1 (0x2),Front Right,,,
+bit 2 (0x4),Subwoofer,,,
+,,,,
+,,,,
+RS-232 Configuration,,,,
+RS-232 Pin Configuration:,,,,
+2 - Tx,,,,
+3 - Rx,,,,
+5 - Ground,,,,
+,,,,
+RS-232 Cable:,,,,
+Straight-wired DB9 is used for PC connection.,,,,
+,,,,
+Communication Settings:,,,,
+Baud rate - 115200,,,,
+Data bits - 8,,,,
+Parity - None,,,,
+Stop Bit - 1,,,,
+Flow Control - None,,,,

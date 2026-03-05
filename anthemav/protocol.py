@@ -695,12 +695,15 @@ class AVR(asyncio.Protocol):
                 self._ignored_commands.extend(mdx.commands_to_ignore)
         
         # Query model-specific commands
+        # For x20: queries ECH? (echo status) and IDN? (MAC address)
+        # For x40: queries GCTXS?, EMAC?, WMAC?
+        # For mdx: queries MAC?
         for cmd in self._model.commands_to_query:
             self.query(cmd)
         
         self._alm_number = self._model.alm_number_mapping
         
-        # x20-specific init
+        # x20-specific init: enable echo (ECH1) after querying status
         if self._model.model_series == "x20":
             self.command("ECH1")
         
